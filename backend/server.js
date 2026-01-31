@@ -3,6 +3,7 @@ const cors = require('cors');
 const http = require('http');
 const socketIo = require('socket.io');
 const { v4: uuidv4 } = require('uuid');
+require('dotenv').config();
 
 const app = express();
 const server = http.createServer(app);
@@ -23,26 +24,26 @@ const decisionsLog = [];
 // Initialize 5 mock stations
 const initStations = () => {
   const cities = [
-    { name: 'NYC', lat: 40.7128, lng: -74.0060 },
-    { name: 'LA', lat: 34.0522, lng: -118.2437 },
-    { name: 'Chicago', lat: 41.8781, lng: -87.6298 },
-    { name: 'Boston', lat: 42.3601, lng: -71.0589 },
-    { name: 'Seattle', lat: 47.6062, lng: -122.3321 }
+    { name: 'Connaught Place', lat: 28.6315, lng: 77.2167 },
+    { name: 'Dwarka', lat: 28.5921, lng: 77.0460 },
+    { name: 'Noida Sector 18', lat: 28.5705, lng: 77.3206 },
+    { name: 'Gurgaon Cyber Hub', lat: 28.4942, lng: 77.0868 },
+    { name: 'Faridabad NIT', lat: 28.3949, lng: 77.3163 }
   ];
   
   cities.forEach((city, idx) => {
     stationsData.set(`station-${idx}`, {
       id: `station-${idx}`,
-      name: `${city.name} Central Hub`,
+      name: `${city.name} Hub`,
       city: city.name,
-      location: `${city.name}, USA`,
+      location: `${city.name}, NCR`,
       status: 'Normal',
       metrics: {
-        swapRate: Math.floor(Math.random() * 20),
-        queueLength: Math.floor(Math.random() * 8),
-        chargedBatteries: Math.floor(Math.random() * 15),
-        chargerUptimePercent: 95 + Math.random() * 5,
-        errorFrequency: Math.floor(Math.random() * 3)
+        swapRate: idx === 0 ? 12 : Math.floor(Math.random() * 20), // CP has high swap rate
+        queueLength: idx === 0 ? 7 : Math.floor(Math.random() * 8), // CP has queue issue
+        chargedBatteries: idx === 1 ? 2 : Math.floor(Math.random() * 15), // Dwarka has low batteries
+        chargerUptimePercent: idx === 2 ? 85 : 95 + Math.random() * 5, // Noida has uptime issue
+        errorFrequency: idx === 3 ? 4 : Math.floor(Math.random() * 3) // Gurgaon has errors
       },
       coordinates: { lat: city.lat, lng: city.lng },
       recentSignals: [],
@@ -66,6 +67,14 @@ app.use('/api/monitoring', monitoringRoutes.router(stationsData));
 const decisionRoutes = require('./routes/decisions');
 app.use('/api/decisions', decisionRoutes.router(stationsData, decisionsLog));
 
+// ===== Reroute Notification Endpoint =====
+const rerouteRoutes = require('./routes/reroute');
+app.use('/api/reroute-driver', rerouteRoutes);
+
+// ===== Maintenance Ticket Endpoint =====
+const maintenanceRoutes = require('./routes/maintenance');
+app.use('/api/maintenance', maintenanceRoutes.router());
+
 // ===== STEP 6: Dashboard API =====
 app.get('/api/stations', (req, res) => {
   const stations = Array.from(stationsData.values());
@@ -79,20 +88,36 @@ app.get('/api/stations/:id', (req, res) => {
 });
 
 app.get('/api/alerts', (req, res) => {
-  const alerts = Array.from(stationsData.values())
-    .filter(s => s.triggers.length > 0)
-    .map(s => ({
-      stationId: s.id,
-      stationName: s.name,
-      status: s.status,
-      triggers: s.triggers,
-      metrics: s.metrics,
-      timestamp: s.lastUpdate
-    }))
-    .sort((a, b) => {
-      const riskOrder = { Critical: 0, Warning: 1, Normal: 2 };
-      return riskOrder[a.status] - riskOrder[b.status];
-    });
+  // Import trigger checking from decisions route
+  const decisionsModule = require('./routes/decisions');
+  
+  const alerts = [];
+  stationsData.forEach((station) => {
+    // Compute triggers on the fly
+    const triggers = decisionsModule.checkTriggersForStation(station);
+    
+    if (triggers.length > 0) {
+      // Determine status based on trigger severity
+      const hasCritical = triggers.some(t => t.severity === 'Critical');
+      const status = hasCritical ? 'Critical' : 'Warning';
+      
+      alerts.push({
+        stationId: station.id,
+        stationName: station.name,
+        status: status,
+        triggers: triggers,
+        metrics: station.metrics,
+        timestamp: station.lastUpdate
+      });
+    }
+  });
+  
+  // Sort by severity
+  alerts.sort((a, b) => {
+    const riskOrder = { Critical: 0, Warning: 1, Normal: 2 };
+    return riskOrder[a.status] - riskOrder[b.status];
+  });
+  
   res.json(alerts);
 });
 

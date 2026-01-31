@@ -28,8 +28,6 @@ const createRouter = (stationsData, io) => {
       station.recentSignals.shift();
     }
 
-    console.log(`📡 Signal received for ${stationId}: ${signalType}`);
-    
     // Broadcast to all connected clients
     io.emit('signal-received', {
       stationId,
