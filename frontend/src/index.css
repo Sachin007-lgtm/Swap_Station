@@ -1,0 +1,121 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Brand Colors */
+    --green-vibrant: 150 100% 41%;
+    --green-dark: 149 100% 33%;
+    --green-service: 161 100% 29%;
+
+    /* Backgrounds */
+    --bg-cta-blue: 212 86% 5%;
+    --bg-slate: 215 28% 17%;
+
+    /* Standard mappings */
+    --background: 215 28% 17%;
+    /* Slate */
+    --foreground: 210 40% 98%;
+    /* White-ish */
+
+    --card: 212 86% 6.5%;
+    /* Slightly lighter than CTA blue for visibility */
+    --card-foreground: 210 40% 98%;
+
+    --popover: 212 86% 5%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 150 100% 41%;
+    /* Vibrant Green */
+    --primary-foreground: 212 86% 5%;
+
+    --secondary: 199 89% 48%;
+    /* Sky Blue */
+    --secondary-foreground: 212 86% 5%;
+
+    --muted: 215 28% 25%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 168 76% 48%;
+    /* Teal Accent */
+    --accent-foreground: 212 86% 5%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 215 28% 30%;
+    --input: 215 28% 30%;
+    --ring: 150 100% 41%;
+
+    --radius: 1rem;
+  }
+
+  .dark {
+    /* Same as root since this IS a dark theme now */
+    --background: 215 28% 17%;
+    --foreground: 210 40% 98%;
+    --card: 212 86% 6.5%;
+    --card-foreground: 210 40% 98%;
+    --popover: 212 86% 5%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 150 100% 41%;
+    --primary-foreground: 212 86% 5%;
+    --secondary: 199 89% 48%;
+    --secondary-foreground: 212 86% 5%;
+    --muted: 215 28% 25%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 168 76% 48%;
+    --accent-foreground: 212 86% 5%;
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 215 28% 30%;
+    --input: 215 28% 30%;
+    --ring: 150 100% 41%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+}
+
+@layer components {
+
+  /* Updated Soft Card for Dark Theme */
+  .soft-card {
+    @apply bg-card rounded-[1.5rem] border border-white/5;
+    box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.5);
+  }
+
+  .soft-card:hover {
+    @apply transition-all duration-300 border-primary/20;
+    box-shadow: 0 10px 30px -4px rgba(0, 210, 106, 0.1);
+    /* Green Glow */
+  }
+
+  /* Pill Buttons */
+  .btn-pill {
+    @apply rounded-full px-6 py-2.5 font-medium transition-all duration-200;
+  }
+
+  .btn-pill:hover {
+    @apply transform scale-105;
+  }
+
+  /* Input Fields */
+  .soft-input {
+    @apply bg-white/5 border border-white/10 rounded-full px-6 py-3 text-foreground focus:bg-white/10 focus:ring-2 focus:ring-primary/50 transition-all outline-none;
+  }
+
+  /* Glass Card effect available for use */
+  .glass-card {
+    @apply bg-card/80 backdrop-blur-md border border-white/10 shadow-xl;
+  }
+}
