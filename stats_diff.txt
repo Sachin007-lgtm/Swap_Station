@@ -1,0 +1,196 @@
+diff --git a/frontend/src/components/dashboard/StatsOverview.tsx b/frontend/src/components/dashboard/StatsOverview.tsx
+index 690a85b..79ea896 100644
+--- a/frontend/src/components/dashboard/StatsOverview.tsx
++++ b/frontend/src/components/dashboard/StatsOverview.tsx
+@@ -1,86 +1,133 @@
+-import { ArrowUpRight, ArrowDownRight, Zap, Users, Battery, Activity } from 'lucide-react';
++import { Battery, AlertTriangle, CheckCircle, Zap, Users, TrendingUp, TrendingDown, ArrowUp, ArrowDown } from 'lucide-react';
+ import { cn } from '@/lib/utils';
+-import { Station } from '@/types/station';
+ 
+ interface StatsOverviewProps {
+-  stations: Station[];
++  stats: {
++    totalStations: number;
++    normalStations: number;
++    warningStations: number;
++    criticalStations: number;
++    activeAlerts: number;
++    totalSwapsToday: number;
++  };
+ }
+ 
+-export const StatsOverview = ({ stations = [] }: StatsOverviewProps) => {
+-  // Calculate aggregate stats
+-  const totalSwaps = stations.reduce((acc, s) => acc + s.metrics.swapRate, 0);
+-  const totalQueue = stations.reduce((acc, s) => acc + s.metrics.queueLength, 0);
+-  const avgUptime = stations.length > 0
+-    ? stations.reduce((acc, s) => acc + s.metrics.chargerUptime, 0) / stations.length
+-    : 0;
+-  const totalErrors = stations.reduce((acc, s) => acc + s.metrics.errorFrequency, 0);
+-
+-  const stats = [
++export const StatsOverview = ({ stats }: StatsOverviewProps) => {
++  const statCards = [
+     {
+-      label: 'Total Swaps',
+-      value: totalSwaps.toLocaleString(),
+-      change: '+12.5%',
+-      trend: 'up',
+-      icon: Zap,
++      label: 'Total Stations',
++      value: stats.totalStations,
++      icon: Battery,
++      trend: '+0%',
++      trendUp: true,
+       color: 'text-primary',
+-      bg: 'bg-primary/10',
++      bgColor: 'bg-primary/5',
++      borderColor: 'border-primary/10',
+     },
+     {
+-      label: 'Queue Length',
+-      value: totalQueue.toString(),
+-      change: '-2.4%',
+-      trend: 'down',
+-      icon: Users,
+-      color: 'text-secondary',
+-      bg: 'bg-secondary/10',
++      label: 'Operational',
++      value: stats.normalStations,
++      sublabel: `${stats.totalStations > 0 ? Math.round((stats.normalStations / stats.totalStations) * 100) : 0}% uptime`,
++      icon: CheckCircle,
++      trend: '+2%',
++      trendUp: true,
++      color: 'text-success',
++      bgColor: 'bg-success/5',
++      borderColor: 'border-success/10',
+     },
+     {
+-      label: 'Avg Uptime',
+-      value: `${avgUptime.toFixed(1)}%`,
+-      change: '+0.8%',
+-      trend: 'up',
+-      icon: Activity,
+-      color: 'text-accent',
+-      bg: 'bg-accent/10',
++      label: 'Warnings',
++      value: stats.warningStations,
++      icon: AlertTriangle,
++      trend: stats.warningStations > 0 ? '+1' : '0',
++      trendUp: false,
++      color: 'text-warning',
++      bgColor: 'bg-warning/5',
++      borderColor: 'border-warning/10',
++      highlight: stats.warningStations > 0,
+     },
+     {
+-      label: 'Active Errors',
+-      value: totalErrors.toString(),
+-      change: '-5%',
+-      trend: 'down',
+-      icon: Battery,
++      label: 'Critical',
++      value: stats.criticalStations,
++      icon: Zap,
++      trend: stats.criticalStations > 0 ? `${stats.criticalStations} active` : 'None',
++      trendUp: false,
+       color: 'text-destructive',
+-      bg: 'bg-destructive/10',
++      bgColor: 'bg-destructive/5',
++      borderColor: 'border-destructive/10',
++      highlight: stats.criticalStations > 0,
++    },
++    {
++      label: 'Active Alerts',
++      value: stats.activeAlerts,
++      icon: AlertTriangle,
++      trend: stats.activeAlerts > 0 ? 'Needs attention' : 'All clear',
++      color: stats.activeAlerts > 0 ? 'text-destructive' : 'text-muted-foreground',
++      bgColor: stats.activeAlerts > 0 ? 'bg-destructive/5' : 'bg-muted/30',
++      borderColor: stats.activeAlerts > 0 ? 'border-destructive/10' : 'border-border/50',
++    },
++    {
++      label: 'Swaps Today',
++      value: stats.totalSwapsToday,
++      sublabel: `~${Math.round(stats.totalSwapsToday / 24)} per hour`,
++      icon: TrendingUp,
++      trend: '+12%',
++      trendUp: true,
++      color: 'text-primary',
++      bgColor: 'bg-primary/5',
++      borderColor: 'border-primary/10',
+     },
+   ];
+ 
+   return (
+-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+-      {stats.map((stat, index) => (
++    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
++      {statCards.map((stat, index) => (
+         <div
+           key={stat.label}
+-          className="bg-white border border-gray-100 shadow-sm rounded-2xl p-5 flex flex-col justify-between h-[140px] relative overflow-hidden group hover:-translate-y-1 hover:shadow-md transition-all duration-300"
++          className={cn(
++            'stat-card group relative overflow-hidden transition-all duration-200',
++            stat.borderColor,
++            stat.highlight && 'ring-2 ring-offset-2',
++            stat.highlight && stat.color.replace('text-', 'ring-')
++          )}
+         >
+-          <div className="flex justify-between items-start">
+-            <div className={cn("p-2.5 rounded-xl", stat.bg)}>
+-              <stat.icon className={cn("w-5 h-5", stat.color)} />
++          {/* Background gradient on hover */}
++          <div className={cn('absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300', stat.bgColor)} />
++          
++          <div className="relative">
++            {/* Icon and Trend */}
++            <div className="flex items-start justify-between mb-4">
++              <div className={cn('p-3 rounded-xl', stat.bgColor)}>
++                <stat.icon className={cn('w-5 h-5', stat.color)} strokeWidth={2} />
++              </div>
++              {stat.trend && (
++                <div className={cn(
++                  'flex items-center gap-0.5 text-xs font-medium px-2 py-1 rounded-full',
++                  stat.trendUp ? 'text-success bg-success/10' : 'text-muted-foreground bg-muted'
++                )}>
++                  {stat.trendUp && <ArrowUp className="w-3 h-3" />}
++                  {stat.trendUp === false && stat.value > 0 && <ArrowDown className="w-3 h-3" />}
++                  <span>{stat.trend}</span>
++                </div>
++              )}
+             </div>
+-            <div className={cn(
+-              "flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full",
+-              stat.trend === 'up' ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'
+-            )}>
+-              {stat.trend === 'up' ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+-              {stat.change}
+-            </div>
+-          </div>
+ 
+-          <div>
+-            <h3 className="text-2xl font-bold text-gray-900 tracking-tight mb-0.5">
++            {/* Value */}
++            <div className={cn('text-3xl font-bold mb-1 tracking-tight', stat.color)}>
+               {stat.value}
+-            </h3>
+-            <p className="text-gray-600 font-medium text-xs">
++            </div>
++
++            {/* Label */}
++            <div className="text-sm font-medium text-muted-foreground mb-1">
+               {stat.label}
+-            </p>
++            </div>
++
++            {/* Sublabel */}
++            {stat.sublabel && (
++              <div className="text-xs text-muted-foreground/70">
++                {stat.sublabel}
++              </div>
++            )}
+           </div>
+         </div>
+       ))}

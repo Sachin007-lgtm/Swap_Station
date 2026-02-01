@@ -5,7 +5,7 @@
 
 const axios = require('axios');
 
-const BACKEND_URL = 'http://localhost:5000';
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:5000';
 const STATIONS = ['station-0', 'station-1', 'station-2', 'station-3', 'station-4'];
 
 const TOTAL_BATTERIES_PER_STATION = 12; // Reduced from 20
