@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Station, Alert, Recommendation } from '@/types/station';
 import { io, Socket } from 'socket.io-client';
 
-const API_URL = 'http://localhost:5000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export const useBackendData = () => {
   const [stations, setStations] = useState<Station[]>([]);

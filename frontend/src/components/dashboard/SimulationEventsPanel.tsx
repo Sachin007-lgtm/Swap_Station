@@ -42,7 +42,7 @@ export const SimulationEventsPanel = ({
 
   const fetchEvents = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/reroute-driver/history');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/reroute-driver/history`);
       if (response.ok) {
         const data = await response.json();
         const nextEvents = (data.history || []).reverse();
@@ -61,7 +61,7 @@ export const SimulationEventsPanel = ({
   const clearEvents = async () => {
     try {
       setClearing(true);
-      const response = await fetch('http://localhost:5000/api/reroute-driver/history', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/reroute-driver/history`, {
         method: 'DELETE',
       });
       if (response.ok) {
