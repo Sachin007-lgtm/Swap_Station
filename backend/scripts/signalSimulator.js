@@ -5,7 +5,7 @@
 
 const axios = require('axios');
 
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:5000';
+const BACKEND_URL = process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
 const STATIONS = ['station-0', 'station-1', 'station-2', 'station-3', 'station-4'];
 
 const TOTAL_BATTERIES_PER_STATION = 12; // Reduced from 20
@@ -188,4 +188,10 @@ const simulateSignals = async () => {
 // START
 // -----------------------------
 
-simulateSignals();
+// Only auto-start if run directly, not when required as module
+if (require.main === module) {
+  simulateSignals();
+}
+
+// Export for integration into server
+module.exports = { simulateSignals };

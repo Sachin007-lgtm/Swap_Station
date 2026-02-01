@@ -218,6 +218,11 @@ const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`🚀 Backend running on http://localhost:${PORT}`);
   console.log(`💻 Frontend expected at http://localhost:3000`);
+  
+  // Auto-start signal simulator
+  console.log('🔄 Starting integrated signal simulator...');
+  const { simulateSignals } = require('./scripts/signalSimulator');
+  simulateSignals();
 });
 
 // Export for testing
