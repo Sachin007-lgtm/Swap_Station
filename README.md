@@ -21,8 +21,94 @@ Unlike traditional monitoring tools, StationOS is **Agentic**. It doesn't just s
 
 ---
 
-## 🏗️ System Architecture
+## 🏗️ Technical Architecture & Diagrams
 
+### 1. Data Flow Diagram (DFD Level 1)
+Shows the movement of telemetry data from station hardware to operational actions.
+
+```mermaid
+graph LR
+    subgraph "External Entities"
+        S[Station Hardware]
+        D[Drivers]
+        O[Operations Team]
+    end
+
+    subgraph "Process"
+        P1[Signal Collection]
+        P2[Monitoring & Triggers]
+        P3[AI Decision Engine]
+        P4[Action Execution]
+    end
+
+    subgraph "Storage"
+        DB[(Supabase DB)]
+        LOG[(In-Memory Logs)]
+    end
+
+    S -->|1. Live Signals| P1
+    P1 -->|2. Batch Update| LOG
+    P1 -->|3. Persist| DB
+    LOG -->|4. Metrics| P2
+    P2 -->|5. Trigger Event| P3
+    P3 -->|6. Recommendation| O
+    O -->|7. Approval| P4
+    P4 -->|8. Reroute/Ticket| D
+```
+
+### 2. Sequential Diagram: AI Decision Loop
+Trace of a "Congestion" event from detection to resolution.
+
+```mermaid
+sequenceDiagram
+    participant S as Station
+    participant B as Backend
+    participant AI as AI Engine (Llama 3.3)
+    participant D as Dashboard
+    participant O as Operator
+
+    S->>B: POST /api/signals/batch (Queue=7)
+    B->>B: Compute Metrics (Threshold=3)
+    B->>AI: requestDecision(Context + Triggers)
+    AI-->>B: { action: "Reroute", why: "High Queue", impact: "Wait time -30%" }
+    B->>D: SocketIO: New Recommendation
+    D->>O: Visual Alert (Amber)
+    O->>D: Click "Approve"
+    D->>B: POST /api/decisions/approve
+    B->>S: Execute Reroute Logic (SMS/Notif)
+    B-->>O: Notification: "Action Executed"
+```
+
+### 3. Component / Architecture Diagram
+High-level structural breakdown of the application modules.
+
+```mermaid
+classDiagram
+    class Frontend {
+        +Dashboard
+        +Header (Nav)
+        +ChatbotPanel
+        +AlertsPanel
+    }
+    class Backend {
+        +SignalRouter
+        +DecisionEngine
+        +AnalyticsRouter
+        +MonitoringService
+    }
+    class ExternalSystems {
+        +Groq (AI Inference)
+        +Supabase (Persistence)
+        +Twilio (SMS)
+    }
+
+    Frontend <..> Backend : REST / WebSockets
+    Backend --> ExternalSystems : API Calls
+```
+
+---
+
+## 🏗️ System Architecture (High Level)
 ```mermaid
 graph TD
     A[Signal Simulator] -->|Real-time Telemetry| B[Node.js Backend]
