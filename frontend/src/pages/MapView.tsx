@@ -11,12 +11,61 @@ import {
   MapPin,
   Navigation,
   ChevronRight,
-  RotateCcw
+  RotateCcw,
+  AlertCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Fix for default Leaflet icons
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
+
+// Custom Icons Generator
+const createStationIcon = (status: string) => {
+  const color = status === 'critical' ? '#ef4444' : status === 'warning' ? '#f59e0b' : '#22c55e';
+
+  return L.divIcon({
+    className: 'custom-div-icon',
+    html: `
+      <div style="
+        background-color: ${color};
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        border: 2px solid white;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      ">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+        </svg>
+      </div>
+      ${status === 'critical' ? '<span style="position: absolute; top: -5px; right: -5px; width: 10px; height: 10px; background-color: #ef4444; border-radius: 50%; border: 2px solid white;"></span>' : ''}
+    `,
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+    popupAnchor: [0, -20]
+  });
+};
 
 interface MapViewProps {
   onBack: () => void;
+}
+
+// Component to handle map centering
+function ChangeView({ center, zoom }: { center: [number, number], zoom: number }) {
+  const map = useMap();
+  map.setView(center, zoom);
+  return null;
 }
 
 export const MapView = ({ onBack }: MapViewProps) => {
@@ -35,6 +84,8 @@ export const MapView = ({ onBack }: MapViewProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedState, setSelectedState] = useState('');
   const [selectedArea, setSelectedArea] = useState('');
+  const [mapCenter, setMapCenter] = useState<[number, number]>([28.6139, 77.2090]); // Delhi Center
+  const [mapZoom, setMapZoom] = useState(11);
 
   const filteredStations = stations.filter(station => {
     const matchesSearch = station.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -42,11 +93,32 @@ export const MapView = ({ onBack }: MapViewProps) => {
     return matchesSearch;
   });
 
+  // Updated to allow "Zoom Only" (shouldOpenModal = false)
+  const handleStationClick = (station: Station, shouldOpenModal = true) => {
+    if (shouldOpenModal) {
+      setSelectedStation(station);
+    }
+
+    if (station.coordinates?.lat && station.coordinates?.lng) {
+      setMapCenter([station.coordinates.lat, station.coordinates.lng]);
+      setMapZoom(14);
+    }
+  };
+
+  const handleResetView = () => {
+    setSearchQuery('');
+    setSelectedState('');
+    setSelectedArea('');
+    setSelectedStation(null);
+    setMapCenter([28.6139, 77.2090]);
+    setMapZoom(11);
+  };
+
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
       {/* Sidebar */}
       <div className="flex h-full">
-        <aside className="w-80 bg-card border-r border-white/5 flex flex-col">
+        <aside className="w-80 bg-card border-r border-white/5 flex flex-col z-20 shadow-xl">
           {/* Logo & Title */}
           <div className="p-6 border-b border-white/5">
             <div className="flex items-center gap-3 mb-2">
@@ -104,14 +176,10 @@ export const MapView = ({ onBack }: MapViewProps) => {
             <Button
               variant="ghost"
               className="w-full gap-2 text-muted-foreground hover:text-foreground"
-              onClick={() => {
-                setSearchQuery('');
-                setSelectedState('');
-                setSelectedArea('');
-              }}
+              onClick={handleResetView}
             >
               <RotateCcw className="w-4 h-4" />
-              RELOAD MAP VIEW
+              RESET VIEW
             </Button>
           </div>
 
@@ -128,7 +196,7 @@ export const MapView = ({ onBack }: MapViewProps) => {
               {filteredStations.map((station) => (
                 <div
                   key={station.id}
-                  onClick={() => setSelectedStation(station)}
+                  onClick={() => handleStationClick(station, true)}
                   className={cn(
                     "p-4 rounded-xl border cursor-pointer transition-all",
                     selectedStation?.id === station.id
@@ -175,85 +243,57 @@ export const MapView = ({ onBack }: MapViewProps) => {
           </div>
         </aside>
 
-        {/* Map Area */}
-        <main className="flex-1 relative bg-muted/20">
-          {/* Map Controls */}
-          <div className="absolute top-6 right-6 z-10 flex flex-col gap-2">
-            <Button
-              size="icon"
-              variant="secondary"
-              className="w-10 h-10 rounded-xl bg-card border border-white/5 shadow-lg"
-            >
-              +
-            </Button>
-            <Button
-              size="icon"
-              variant="secondary"
-              className="w-10 h-10 rounded-xl bg-card border border-white/5 shadow-lg"
-            >
-              −
-            </Button>
-          </div>
+        {/* Leaflet Map Area */}
+        <main className="flex-1 relative bg-slate-50">
+          <MapContainer
+            center={[28.6139, 77.2090]}
+            zoom={11}
+            scrollWheelZoom={true}
+            className="w-full h-full outline-none"
+          >
+            <ChangeView center={mapCenter} zoom={mapZoom} />
 
-          {/* User Location Button */}
-          <div className="absolute top-6 right-20 z-10">
-            <Button
-              size="icon"
-              variant="secondary"
-              className="w-10 h-10 rounded-full bg-card border border-white/5 shadow-lg"
-            >
-              <Navigation className="w-4 h-4" />
-            </Button>
-          </div>
+            {/* CartoDB Positron (White/Light Theme) */}
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+              url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+            />
 
-          {/* Map Placeholder - In production, integrate Leaflet/Mapbox here */}
-          <div className="w-full h-full bg-gradient-to-br from-muted/10 to-muted/30 flex items-center justify-center relative overflow-hidden">
-            {/* Simulated Map Grid */}
-            <div className="absolute inset-0 opacity-10">
-              <div className="grid grid-cols-12 grid-rows-12 h-full w-full">
-                {Array.from({ length: 144 }).map((_, i) => (
-                  <div key={i} className="border border-white/5" />
-                ))}
-              </div>
-            </div>
-
-            {/* Station Markers */}
-            {filteredStations.map((station, index) => (
-              <div
+            {filteredStations.map((station) => (
+              <Marker
                 key={station.id}
-                onClick={() => setSelectedStation(station)}
-                className="absolute cursor-pointer group"
-                style={{
-                  left: `${20 + (index * 15) % 60}%`,
-                  top: `${30 + (index * 20) % 40}%`,
+                position={[station.coordinates?.lat || 28.6, station.coordinates?.lng || 77.2]}
+                icon={createStationIcon(station.status)}
+                eventHandlers={{
+                  click: () => handleStationClick(station, false), // Zoom only
                 }}
               >
-                <div className={cn(
-                  "w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-all",
-                  "border-4 border-background",
-                  station.status === 'critical' && "bg-destructive",
-                  station.status === 'warning' && "bg-accent",
-                  station.status === 'normal' && "bg-primary",
-                  selectedStation?.id === station.id && "scale-125 ring-4 ring-primary/50"
-                )}>
-                  <Zap className="w-6 h-6 text-white fill-current" />
-                </div>
-
-                {/* Tooltip */}
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                  <div className="bg-popover text-popover-foreground px-3 py-2 rounded-lg text-xs font-medium shadow-xl border border-white/10 whitespace-nowrap">
-                    <div className="font-bold">{station.name}</div>
-                    <div className="text-muted-foreground">{station.metrics.swapRate} swaps</div>
+                <Popup>
+                  <div className="p-2 min-w-[200px]">
+                    <h3 className="font-bold text-lg mb-1">{station.name}</h3>
+                    <p className="text-xs text-gray-500 mb-2">{station.location}</p>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="bg-gray-100 p-1 rounded text-center">
+                        <span className="block font-bold">{station.metrics.swapRate}</span>
+                        <span className="text-[10px] text-gray-500">Swaps/Hr</span>
+                      </div>
+                      <div className="bg-gray-100 p-1 rounded text-center">
+                        <span className="block font-bold">{station.metrics.queueLength}</span>
+                        <span className="text-[10px] text-gray-500">Queue</span>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      className="w-full mt-3 h-8 text-xs"
+                      onClick={() => setSelectedStation(station)}
+                    >
+                      View Details
+                    </Button>
                   </div>
-                </div>
-              </div>
+                </Popup>
+              </Marker>
             ))}
-
-            {/* Map Attribution */}
-            <div className="absolute bottom-4 right-4 text-xs text-muted-foreground bg-card/80 backdrop-blur-sm px-3 py-1 rounded-lg border border-white/5">
-              © Leaflet | © OpenStreetMap
-            </div>
-          </div>
+          </MapContainer>
         </main>
       </div>
 
@@ -263,7 +303,12 @@ export const MapView = ({ onBack }: MapViewProps) => {
           station={selectedStation}
           alerts={getAlertsByStation(selectedStation.id)}
           recommendations={getRecommendationsByStation(selectedStation.id)}
-          onClose={() => setSelectedStation(null)}
+          onClose={() => {
+            // Reset logic when closing details
+            setSelectedStation(null);
+            setMapCenter([28.6139, 77.2090]); // Pan back to Delhi
+            setMapZoom(11); // Zoom out to see all
+          }}
           onAcknowledge={acknowledgeAlert}
           onEvaluate={fetchRecommendations}
         />

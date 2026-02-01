@@ -44,7 +44,11 @@ export interface Recommendation {
   impact: string;
   confidence: number;
   timestamp: string;
-  decisionId?: string; // Add decision ID for approval
+  decisionId?: string;
+  probableRootCause?: string;
+  timeToStockoutMinutes?: number;
+  /** Set when aggressive mode auto-executes: 'executed' | 'auto-execute-failed' */
+  status?: string;
 }
 
 export interface Signal {

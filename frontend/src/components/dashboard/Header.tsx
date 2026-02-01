@@ -1,6 +1,8 @@
-import { Bell, Search, Settings, Zap, Route } from 'lucide-react';
+import { Bell, Search, Settings, Zap, Route, Bot, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 
 interface HeaderProps {
@@ -13,6 +15,10 @@ interface HeaderProps {
   onAlertsClick: () => void;
   onRerouteClick: () => void;
   onMaintenanceClick: () => void;
+  onStationsClick?: () => void;
+  onChatClick?: () => void;
+  copilotMode?: 'conservative' | 'aggressive';
+  onCopilotModeChange?: (mode: 'conservative' | 'aggressive') => void;
 }
 
 export const Header = ({
@@ -25,6 +31,10 @@ export const Header = ({
   onAlertsClick,
   onRerouteClick,
   onMaintenanceClick,
+  onStationsClick,
+  onChatClick,
+  copilotMode = 'conservative',
+  onCopilotModeChange,
 }: HeaderProps) => {
   return (
     <header className={cn(
@@ -72,23 +82,51 @@ export const Header = ({
           "hidden lg:flex items-center gap-6 text-sm font-medium transition-colors duration-500",
           isScrolled ? "text-gray-600" : "text-white/80"
         )}>
-          {['Dashboard', 'Stations', 'Analytics', 'Maintenance', 'Settings'].map((item) => (
+          {[
+            { name: 'Dashboard', click: undefined },
+            { name: 'Stations', click: onStationsClick },
+            { name: 'Analytics', click: onChatClick },
+            { name: 'Reroutes', click: onRerouteClick },
+            { name: 'Maintenance', click: onMaintenanceClick },
+            { name: 'Settings', click: undefined }
+          ].map((item) => (
             <button
-              key={item}
+              key={item.name}
+              onClick={item.click}
               className={cn(
                 "transition-all duration-300",
-                item === 'Dashboard'
+                item.name === 'Dashboard'
                   ? (isScrolled ? "text-gray-900 font-bold border-b-2 border-primary pb-1" : "text-white font-bold border-b-2 border-white pb-1")
                   : (isScrolled ? "hover:text-gray-900" : "hover:text-white")
               )}
             >
-              {item}
+              {item.name}
             </button>
           ))}
         </nav>
 
         {/* Right Actions */}
         <div className="flex items-center gap-4">
+          {/* Copilot mode - always visible when handler provided */}
+          {onCopilotModeChange && (
+            <div className={cn(
+              "hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full border transition-colors",
+              isScrolled
+                ? "bg-gray-50 border-gray-200 text-gray-700"
+                : "bg-white/10 border-white/20 text-white"
+            )}>
+              <Bot className="w-4 h-4 shrink-0" />
+              <Label htmlFor="header-copilot-mode" className="text-xs font-semibold cursor-pointer whitespace-nowrap">
+                Copilot: {copilotMode === 'conservative' ? 'Conservative' : 'Aggressive'}
+              </Label>
+              <Switch
+                id="header-copilot-mode"
+                checked={copilotMode === 'aggressive'}
+                onCheckedChange={(checked) => onCopilotModeChange(checked ? 'aggressive' : 'conservative')}
+                className="scale-90"
+              />
+            </div>
+          )}
           <div className="relative hidden md:block group">
             <Search className={cn(
               "absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors duration-500",
@@ -134,6 +172,24 @@ export const Header = ({
                 </div>
               </Button>
             ))}
+
+            {/* AI Chat Button */}
+            {onChatClick && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "rounded-full w-9 h-9 transition-all duration-300 relative group overflow-hidden",
+                  isScrolled
+                    ? "bg-primary/10 hover:bg-primary text-primary hover:text-white border border-primary/20"
+                    : "bg-white/20 hover:bg-white text-white hover:text-primary border border-white/20"
+                )}
+                onClick={onChatClick}
+              >
+                <Sparkles className="w-4 h-4" />
+                <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/20 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+              </Button>
+            )}
 
             <div className={cn(
               "w-9 h-9 rounded-full bg-gradient-to-tr from-[#00d2ff] to-[#3a7bd5] ml-2 border-2 cursor-pointer hover:shadow-md transition-all duration-300",

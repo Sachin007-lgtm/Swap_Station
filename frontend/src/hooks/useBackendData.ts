@@ -117,13 +117,13 @@ export const useBackendData = () => {
     }
   };
 
-  // Fetch recommendations for a station
-  const fetchRecommendations = async (stationId: string) => {
+  // Fetch recommendations for a station (mode: conservative = recommend only, aggressive = auto-execute on high risk)
+  const fetchRecommendations = async (stationId: string, mode: 'conservative' | 'aggressive' = 'conservative') => {
     try {
       const response = await fetch(`${API_URL}/api/decisions/evaluate/${stationId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'conservative' }),
+        body: JSON.stringify({ mode }),
       });
       
       if (response.ok) {
@@ -135,7 +135,7 @@ export const useBackendData = () => {
         // Transform backend recommendations to frontend format
         const transformedRecs: Recommendation[] = decisions.map((rec: any, index: number) => ({
           id: rec.id || `rec-${stationId}-${index}`,
-          decisionId: rec.id, // Store decision ID for approval
+          decisionId: rec.id,
           stationId: stationId,
           stationName: data.station?.name || '',
           type: 'action',
@@ -146,6 +146,9 @@ export const useBackendData = () => {
           impact: rec.explanation?.impact || rec.explanation?.expectedImpact || '',
           confidence: rec.explanation?.confidenceScore || (rec.explanation?.confidence === 'High' ? 90 : rec.explanation?.confidence === 'Medium' ? 70 : 50),
           timestamp: new Date().toISOString(),
+          probableRootCause: rec.explanation?.probableRootCause,
+          timeToStockoutMinutes: rec.explanation?.timeToStockoutMinutes,
+          status: rec.status,
         }));
         
         setRecommendations(prev => [
@@ -203,11 +206,10 @@ export const useBackendData = () => {
   );
 
   const getRecommendationsByStation = useCallback(
-    (stationId: string) => {
+    (stationId: string, mode?: 'conservative' | 'aggressive') => {
       const stationRecs = recommendations.filter((r) => r.stationId === stationId);
-      // If no recommendations loaded yet, fetch them
       if (stationRecs.length === 0) {
-        fetchRecommendations(stationId);
+        fetchRecommendations(stationId, mode ?? 'conservative');
       }
       return stationRecs;
     },

@@ -29,9 +29,10 @@ interface StationDetailProps {
   recommendations: Recommendation[];
   onClose: () => void;
   onAcknowledge: (alertId: string) => void;
-  // Accept any promise shape to avoid type mismatch with fetchRecommendations
   onEvaluate?: (stationId: string) => Promise<any>;
   onApprove?: (decisionId: string, mode: 'live_demo' | 'simulation') => Promise<any>;
+  copilotMode?: 'conservative' | 'aggressive';
+  onCopilotModeChange?: (mode: 'conservative' | 'aggressive') => void;
 }
 
 export const StationDetail = ({
@@ -42,6 +43,8 @@ export const StationDetail = ({
   onAcknowledge,
   onEvaluate,
   onApprove,
+  copilotMode = 'conservative',
+  onCopilotModeChange,
 }: StationDetailProps) => {
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [approvingId, setApprovingId] = useState<string | null>(null);
@@ -60,8 +63,7 @@ export const StationDetail = ({
 
     setApprovingId(decisionId);
     try {
-      await onApprove(decisionId, rerouteMode); // Use selected mode
-      // Refresh recommendations after approval
+      await onApprove(decisionId, rerouteMode);
       if (onEvaluate) {
         await onEvaluate(station.id);
       }
@@ -96,7 +98,7 @@ export const StationDetail = ({
   const config = statusConfig[station.status];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-fade-in">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-fade-in">
       <div
         className={cn(
           'glass-card w-full max-w-4xl max-h-[90vh] overflow-hidden border-2 animate-scale-in',
@@ -226,24 +228,43 @@ export const StationDetail = ({
             </TabsList>
 
             <TabsContent value="recommendations" className="space-y-4">
-              {recommendations.length > 0 && (
-                <div className="bg-muted/50 rounded-lg p-4 mb-4 flex items-center justify-between">
-                  <div>
-                    <Label className="text-sm font-medium">Reroute Mode</Label>
-
+              <div className="bg-muted/50 rounded-lg p-4 mb-4 space-y-3">
+                {onCopilotModeChange && (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm font-medium">Copilot mode</Label>
+                      <p className="text-xs text-muted-foreground">
+                        {copilotMode === 'conservative' ? 'Recommend only (ops approve)' : 'Auto-execute on high risk'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="copilot-mode" className="text-sm font-medium cursor-pointer">
+                        {copilotMode === 'conservative' ? 'Conservative' : 'Aggressive'}
+                      </Label>
+                      <Switch
+                        id="copilot-mode"
+                        checked={copilotMode === 'aggressive'}
+                        onCheckedChange={(checked) => onCopilotModeChange(checked ? 'aggressive' : 'conservative')}
+                      />
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-3">
-                    <Label htmlFor="mode-toggle" className="text-sm font-medium cursor-pointer">
-                      {rerouteMode === 'simulation' ? 'Simulation' : 'Live Demo'}
-                    </Label>
-                    <Switch
-                      id="mode-toggle"
-                      checked={rerouteMode === 'live_demo'}
-                      onCheckedChange={(checked) => setRerouteMode(checked ? 'live_demo' : 'simulation')}
-                    />
+                )}
+                {recommendations.length > 0 && (
+                  <div className="flex items-center justify-between pt-2 border-t border-border/50">
+                    <Label className="text-sm font-medium">Reroute execution</Label>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="mode-toggle" className="text-sm font-medium cursor-pointer">
+                        {rerouteMode === 'simulation' ? 'Simulation' : 'Live Demo'}
+                      </Label>
+                      <Switch
+                        id="mode-toggle"
+                        checked={rerouteMode === 'live_demo'}
+                        onCheckedChange={(checked) => setRerouteMode(checked ? 'live_demo' : 'simulation')}
+                      />
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
 
               {recommendations.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
@@ -360,9 +381,21 @@ const RecommendationCard = ({ recommendation, index, onApprove, isApproving }: R
           </div>
           <div>
             <h4 className="font-bold text-lg text-foreground">{recommendation.action}</h4>
-            <Badge className={cn('mt-1 px-2 py-0.5 rounded-full font-semibold', config.badge)} variant="secondary">
-              {recommendation.priority} priority
-            </Badge>
+            <div className="flex flex-wrap items-center gap-1.5 mt-1">
+              <Badge className={cn('px-2 py-0.5 rounded-full font-semibold', config.badge)} variant="secondary">
+                {recommendation.priority} priority
+              </Badge>
+              {recommendation.status === 'executed' && (
+                <Badge className="px-2 py-0.5 rounded-full font-semibold bg-green-500/20 text-green-700 border border-green-500/30">
+                  Auto-executed
+                </Badge>
+              )}
+              {recommendation.status === 'auto-execute-failed' && (
+                <Badge variant="secondary" className="px-2 py-0.5 rounded-full font-semibold bg-amber-500/20 text-amber-700">
+                  Auto-execute failed
+                </Badge>
+              )}
+            </div>
           </div>
         </div>
         <div className="text-right">
@@ -383,6 +416,24 @@ const RecommendationCard = ({ recommendation, index, onApprove, isApproving }: R
           </div>
           <p className="text-sm font-medium text-foreground">{recommendation.reason}</p>
         </div>
+        {recommendation.timeToStockoutMinutes != null && (
+          <div>
+            <div className="text-xs uppercase tracking-wider font-bold text-muted-foreground mb-1">
+              Stockout prediction
+            </div>
+            <p className="text-sm font-bold text-amber-600">
+              Estimated time to stockout: ~{recommendation.timeToStockoutMinutes} min
+            </p>
+          </div>
+        )}
+        {recommendation.probableRootCause && (
+          <div>
+            <div className="text-xs uppercase tracking-wider font-bold text-muted-foreground mb-1">
+              Probable root cause
+            </div>
+            <p className="text-sm font-medium text-foreground">{recommendation.probableRootCause}</p>
+          </div>
+        )}
         <div>
           <div className="text-xs uppercase tracking-wider font-bold text-muted-foreground mb-1">
             Expected Impact
@@ -392,14 +443,18 @@ const RecommendationCard = ({ recommendation, index, onApprove, isApproving }: R
       </div>
 
       <div className="flex justify-end mt-5">
-        <Button
-          className="gap-2 rounded-full px-6 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all hover:-translate-y-0.5"
-          onClick={() => onApprove && recommendation.decisionId && onApprove(recommendation.decisionId)}
-          disabled={isApproving || !recommendation.decisionId}
-        >
-          {isApproving ? 'Approving...' : 'Take Action'}
-          <ArrowRight className="w-4 h-4" />
-        </Button>
+        {recommendation.status === 'executed' ? (
+          <span className="text-sm font-medium text-green-600">Already executed by copilot</span>
+        ) : (
+          <Button
+            className="gap-2 rounded-full px-6 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all hover:-translate-y-0.5"
+            onClick={() => onApprove && recommendation.decisionId && onApprove(recommendation.decisionId)}
+            disabled={isApproving || !recommendation.decisionId}
+          >
+            {isApproving ? 'Approving...' : 'Take Action'}
+            <ArrowRight className="w-4 h-4" />
+          </Button>
+        )}
       </div>
     </div>
   );

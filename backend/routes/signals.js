@@ -1,14 +1,15 @@
 // STEP 1: Collect & Stream Station Signals
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
+const supabase = require('../db/supabaseClient');
 
 const router = express.Router();
 
 const createRouter = (stationsData, io) => {
   // Receive signal from a station
-  router.post('/receive', (req, res) => {
+  router.post('/receive', async (req, res) => {
     const { stationId, signalType, data } = req.body;
-    
+
     if (!stationsData.has(stationId)) {
       return res.status(404).json({ error: 'Station not found' });
     }
@@ -35,13 +36,24 @@ const createRouter = (stationsData, io) => {
       timestamp: new Date()
     });
 
+    // Save to Supabase (Async - fire and forget)
+    if (supabase) {
+      supabase.from('signals').insert({
+        station_id: stationId,
+        type: signalType,
+        value: data
+      }).then(({ error }) => {
+        if (error) console.error('Error saving signal to Supabase:', error.message);
+      });
+    }
+
     res.json({ success: true, signalId: signal.id });
   });
 
   // Stream signals (batch)
-  router.post('/batch', (req, res) => {
+  router.post('/batch', async (req, res) => {
     const { signals } = req.body;
-    
+
     const results = signals.map(sig => {
       if (!stationsData.has(sig.stationId)) {
         return { stationId: sig.stationId, success: false, error: 'Station not found' };
@@ -64,6 +76,23 @@ const createRouter = (stationsData, io) => {
       io.emit('signal-received', { stationId: sig.stationId, signal });
       return { stationId: sig.stationId, success: true, signalId: signal.id };
     });
+
+    // Bulk save to Supabase
+    if (supabase) {
+      const dbSignals = signals
+        .filter(sig => stationsData.has(sig.stationId))
+        .map(sig => ({
+          station_id: sig.stationId,
+          type: sig.type,
+          value: sig.data
+        }));
+
+      if (dbSignals.length > 0) {
+        supabase.from('signals').insert(dbSignals).then(({ error }) => {
+          if (error) console.error('Error saving batch signals to Supabase:', error.message);
+        });
+      }
+    }
 
     res.json({ success: true, results });
   });

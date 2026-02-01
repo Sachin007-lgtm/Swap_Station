@@ -1,7 +1,14 @@
-// Reroute Driver Endpoint - Receives reroute notifications and forwards to n8n
+// Reroute Driver Endpoint - Receives reroute notifications and forwards to n8n + Twilio SMS
 const express = require('express');
 const fetch = require('node-fetch');
+const twilio = require('twilio');
 const router = express.Router();
+
+// Initialize Twilio
+const twilioClient = process.env.TWILIO_ACCOUNT_SID ? new twilio(
+  process.env.TWILIO_ACCOUNT_SID,
+  process.env.TWILIO_AUTH_TOKEN
+) : null;
 
 // Store reroute history
 const rerouteHistory = [];
@@ -9,7 +16,7 @@ const rerouteHistory = [];
 // Middleware to validate Bearer token
 const validateToken = (req, res, next) => {
   const authHeader = req.headers.authorization;
-  const expectedToken = process.env.REROUTE_API_TOKEN || 'demo_reroute_secret_123';
+  const expectedToken = process.env.REROUTE_API_TOKEN || 'DEMO_REROUTE_TOKEN';
   
   if (!authHeader) {
     return res.status(401).json({ error: 'Missing authorization header' });
@@ -45,54 +52,66 @@ router.post('/', validateToken, async (req, res) => {
     id: `notif_${Date.now()}`,
     timestamp: new Date().toISOString(),
     payload: payload,
-    status: 'received'
+    status: 'received',
+    sms_status: 'pending'
   };
   
   rerouteHistory.push(notification);
   
-  // Forward to n8n webhook
+  // 1. Send SMS via Twilio (Priority)
+  if (twilioClient) {
+    const targetPhone = process.env.DEMO_DRIVER_PHONE || '+919818166684'; // Default to user provided number
+    const messageBody = `🚗 DRIVER ALERT: Reroute Requested.\nFrom: ${payload.station_from}\nTo: ${payload.station_to}\nReason: Congestion (Swap Rate > 15/hr)\nAction Required: Divert immediately.`;
+    
+    try {
+        console.log(`📱 Sending SMS to ${targetPhone}...`);
+        const message = await twilioClient.messages.create({
+            body: messageBody,
+            from: process.env.TWILIO_PHONE_NUMBER,
+            to: targetPhone
+        });
+        console.log(`✅ SMS Sent! SID: ${message.sid}`);
+        notification.sms_status = 'sent';
+        notification.sms_sid = message.sid;
+    } catch (smsError) {
+        console.error('❌ SMS Failed:', smsError.message);
+        notification.sms_status = 'failed';
+        notification.sms_error = smsError.message;
+    }
+  } else {
+      console.warn('⚠️ Twilio Config missing in .env, skipping SMS.');
+      notification.sms_status = 'skipped_no_config';
+  }
+  
+  // 2. Forward to n8n webhook (Secondary)
   const n8nWebhook = process.env.N8N_WEBHOOK_URL || 'http://localhost:5678/webhook-test/notification-trigger';
   
   try {
     console.log('📤 Forwarding to n8n:', n8nWebhook);
-    console.log('📦 Payload:', JSON.stringify(payload, null, 2));
     
-    const n8nResponse = await fetch(n8nWebhook, {
+    // Fire and forget n8n to speed up response
+    fetch(n8nWebhook, {
       method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
-    });
+    }).then(async (n8nResponse) => {
+        if (n8nResponse.ok) {
+            console.log('✅ Sent to n8n');
+        } else {
+            console.error('❌ n8n error:', n8nResponse.status);
+        }
+    }).catch(err => console.error('❌ n8n fetch error:', err.message));
     
-    console.log('📬 n8n response status:', n8nResponse.status);
-    
-    if (n8nResponse.ok) {
-      const n8nData = await n8nResponse.json().catch(() => ({}));
-      notification.status = 'sent_to_n8n';
-      notification.n8nResponse = n8nData;
-      console.log('✅ Successfully sent to n8n');
-    } else {
-      const errorText = await n8nResponse.text();
-      console.error('❌ n8n webhook responded with error:', n8nResponse.status);
-      console.error('❌ Error details:', errorText);
-      notification.status = 'n8n_error';
-      notification.error = `n8n returned status ${n8nResponse.status}: ${errorText}`;
-    }
   } catch (error) {
-    console.error('❌ Failed to send to n8n:', error.message);
-    console.error('❌ Stack:', error.stack);
-    notification.status = 'failed';
-    notification.error = error.message;
+    console.error('❌ Failed to prepare n8n request:', error.message);
   }
   
-  // Return success response
+  // Return success response immediately
   res.json({
     success: true,
     notification_id: notification.id,
-    n8n_status: notification.status,
-    timestamp: notification.timestamp,
-    mode: payload.mode // Include mode in response for debugging
+    sms_status: notification.sms_status,
+    timestamp: notification.timestamp
   });
 });
 
@@ -102,6 +121,7 @@ router.get('/history', (req, res) => {
     id: notification.id,
     timestamp: notification.timestamp,
     ...notification.payload,
+    sms_status: notification.sms_status
   }));
 
   res.json({

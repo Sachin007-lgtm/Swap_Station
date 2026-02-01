@@ -2,6 +2,8 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const fetch = require('node-fetch');
+const { computeMetricsFromSignals } = require('./monitoring');
+const Groq = require('groq-sdk');
 
 const router = express.Router();
 
@@ -11,9 +13,19 @@ const createRouter = (stationsData, decisionsLog) => {
   const REROUTE_API_TOKEN = process.env.REROUTE_API_TOKEN || 'DEMO_REROUTE_TOKEN';
   const MAINTENANCE_API_ENDPOINT = process.env.MAINTENANCE_API_ENDPOINT || 'http://localhost:5000/api/maintenance/ticket';
   const MAINTENANCE_API_TOKEN = process.env.MAINTENANCE_API_TOKEN || 'DEMO_MAINTENANCE_TOKEN';
-  const DEMO_DRIVER_PHONE = process.env.DEMO_DRIVER_PHONE || '+919205408755';
+  const DEMO_DRIVER_PHONE = process.env.DEMO_DRIVER_PHONE || '+919818166684';
+  const GROQ_API_KEY = process.env.GROQ_API_KEY;
   const MAX_RETRIES = 3;
-  
+
+  // Initialize Groq Client
+  let groqClient = null;
+  if (GROQ_API_KEY) {
+    groqClient = new Groq({ apiKey: GROQ_API_KEY });
+    console.log('🧠 Groq AI initialized');
+  } else {
+    console.warn('⚠️ GROQ_API_KEY missing. Falling back to rule-based logic.');
+  }
+
   console.log('🔧 Configuration loaded:');
   console.log('   DEMO_DRIVER_PHONE:', DEMO_DRIVER_PHONE);
 
@@ -195,7 +207,8 @@ const createRouter = (stationsData, decisionsLog) => {
           severity: decision.severity.toLowerCase(),
           current_uptime: `${currentStation.metrics.chargerUptimePercent}%`,
           error_count: currentStation.metrics.errorFrequency,
-          error_details: errorSignals.length > 0 ? errorSignals : ['Charger performance degraded']
+          error_details: errorSignals.length > 0 ? errorSignals : ['Charger performance degraded'],
+          probable_root_cause: decision.explanation?.probableRootCause || (errorSignals.length > 0 ? `Recurring errors: ${errorSignals.slice(-3).join('; ')}` : 'Charger performance degraded')
         },
         impact: {
           affected_chargers: affectedChargers,
@@ -206,6 +219,7 @@ const createRouter = (stationsData, decisionsLog) => {
         sla: decision.severity === 'Critical' ? '2 hours' : '4 hours',
         trigger: decision.trigger,
         reason: decision.explanation?.why,
+        probable_root_cause: decision.explanation?.probableRootCause || null,
         expected_impact: decision.explanation?.expectedImpact,
         confidence: decision.explanation?.confidence,
         timestamp: new Date().toISOString()
@@ -252,7 +266,7 @@ const createRouter = (stationsData, decisionsLog) => {
 
     const distance = Number(distanceKm(currentStation, targetStation).toFixed(1));
     const expectedWaitTime = Math.max(1, Math.floor(targetStation.metrics?.queueLength / 2));
-    
+
     // Extract confidence from decision explanation
     const confidenceMap = { 'High': 0.89, 'Medium': 0.72, 'Low': 0.55 };
     const confidence = confidenceMap[decision.explanation?.confidence] || 0.75;
@@ -260,9 +274,9 @@ const createRouter = (stationsData, decisionsLog) => {
     // Generate mock driver data from queue
     const queueLength = currentStation.metrics?.queueLength || 0;
     const driversToReroute = Math.min(queueLength, 3); // Reroute up to 3 drivers
-    
+
     let payload;
-    
+
     if (mode === 'live_demo') {
       // Live demo mode - send for first driver with phone and location
       payload = {
@@ -293,7 +307,7 @@ const createRouter = (stationsData, decisionsLog) => {
       const drivers = Array.from({ length: driversToReroute }, (_, i) => ({
         driver_id: `DR_${String(100 + i).padStart(3, '0')}`
       }));
-      
+
       payload = {
         mode: 'simulation',
         drivers: drivers,
@@ -335,81 +349,125 @@ const createRouter = (stationsData, decisionsLog) => {
       }
     };
   };
-  // Define trigger rules (STEP 3)
-  const checkTriggers = (station) => {
-    const { metrics } = station;
-    const triggers = [];
 
-    // Congestion: Queue > 5 OR wait time > 7 mins
-    if (metrics.queueLength > 5) {
-      triggers.push({
-        name: 'Congestion',
-        severity: 'Warning',
-        metric: 'queueLength',
-        value: metrics.queueLength,
-        threshold: 5,
-        reason: `Queue length (${metrics.queueLength}) exceeds threshold (5)`
-      });
-    }
-
-    // Stockout risk: Charged batteries < 3 AND demand rising
-    if (metrics.chargedBatteries < 3 && metrics.swapRate > 5) {
-      triggers.push({
-        name: 'Stockout Risk',
-        severity: metrics.chargedBatteries === 0 ? 'Critical' : 'Warning',
-        metric: 'chargedBatteries',
-        value: metrics.chargedBatteries,
-        threshold: 3,
-        reason: `Low battery inventory (${metrics.chargedBatteries}) with high demand (${metrics.swapRate} swaps/15min)`
-      });
-    }
-
-    // Charger failure: Same error ≥ 3 times
-    if (metrics.errorFrequency >= 3) {
-      triggers.push({
-        name: 'Charger Fault',
-        severity: 'Warning',
-        metric: 'errorFrequency',
-        value: metrics.errorFrequency,
-        threshold: 3,
-        reason: `Multiple charger errors detected (${metrics.errorFrequency} errors)`
-      });
-    }
-
-    // Charger downtime: Uptime < 90%
-    if (metrics.chargerUptimePercent < 90) {
-      triggers.push({
-        name: 'Charger Downtime',
-        severity: 'Warning',
-        metric: 'chargerUptimePercent',
-        value: metrics.chargerUptimePercent,
-        threshold: 90,
-        reason: `Charger uptime (${metrics.chargerUptimePercent}%) below acceptable level`
-      });
-    }
-
-    // Multi-failure (escalation)
-    if (triggers.length >= 2) {
-      triggers.push({
-        name: 'Multi-Failure Escalation',
-        severity: 'Critical',
-        metric: 'multiple',
-        value: triggers.length,
-        threshold: 2,
-        reason: `Multiple issues detected simultaneously at station`
-      });
-    }
-
-    return triggers;
+  // Helper: detect recurring fault (same error code ≥ 3 in recent signals)
+  const getRecurringFault = (station) => {
+    const errorSignals = (station.recentSignals || []).filter(s => s.type === 'error_log').slice(-20);
+    const byCode = {};
+    errorSignals.forEach(s => {
+      const code = s.data?.errorCode || s.data?.message || s.data?.code || 'UNKNOWN';
+      byCode[code] = (byCode[code] || 0) + 1;
+    });
+    const entry = Object.entries(byCode).find(([, count]) => count >= 3);
+    return entry ? { code: entry[0], count: entry[1] } : null;
   };
 
-  // Decision logic (STEP 4)
-  const decideAction = (station, triggers, mode = 'conservative') => {
+  // Define trigger rules (STEP 3) - Consistent logic
+  const checkTriggers = (station) => {
+    return checkTriggersForStation(station);
+  };
+
+  // --- LLM DECISION HELPER ---
+  const getGroqDecision = async (station, triggers) => {
+    if (!groqClient) return null;
+
+    const systemPrompt = `You are an operational AI for an EV Battery Swap Station Network. 
+Analyze station metrics and triggers to recommend actions. 
+Your goal is to minimize driver wait times and ensure battery availability.
+
+Output JSON ONLY in this format:
+{
+  "actions": [
+    {
+      "trigger": "Trigger Name",
+      "severity": "Warning|Critical",
+      "action": "Action Name", 
+      "explanation": {
+        "why": "Reasoning...",
+        "expectedImpact": "Impact...",
+        "confidence": "High|Medium|Low",
+        "probableRootCause": "Optional..."
+      }
+    }
+  ]
+}
+
+Allowed Actions: 'Reroute Drivers', 'Initiate Inventory Rebalance', 'Create Maintenance Ticket', 'Alert Maintenance Team', 'Escalate to On-Call Manager'.
+`;
+
+    const userPrompt = `
+Station: ${station.name} (${station.city})
+Metrics:
+- Queue: ${station.metrics.queueLength}
+- Swap Rate: ${station.metrics.swapRate}/15min
+- Charged Batteries: ${station.metrics.chargedBatteries}
+- Uptime: ${station.metrics.chargerUptimePercent}%
+- Errors: ${station.metrics.errorFrequency}
+
+Active Triggers: ${JSON.stringify(triggers)}
+
+Recommend actions.
+`;
+
+    try {
+      const completion = await groqClient.chat.completions.create({
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        model: 'llama-3.3-70b-versatile',
+        temperature: 0.1,
+        response_format: { type: 'json_object' }
+      });
+
+      return JSON.parse(completion.choices[0].message.content);
+    } catch (err) {
+      console.error('❌ Groq API Error:', err.message);
+      return null;
+    }
+  };
+
+  // Decision logic (STEP 4) + explainability (probable root cause, stockout prediction)
+  const decideAction = async (station, triggers, mode = 'conservative') => {
     const actions = [];
     const explanations = [];
 
+    // try LLM first
+    let llmResult = null;
+    if (triggers.length > 0) {
+      // Only call LLM if there are triggers to analyze
+      console.log(`🤖 Consulting AI for ${station.id}...`);
+      llmResult = await getGroqDecision(station, triggers);
+    }
+
+    if (llmResult && llmResult.actions && Array.isArray(llmResult.actions)) {
+      console.log(`✅ AI returned ${llmResult.actions.length} recommendations`);
+      llmResult.actions.forEach(rec => {
+        const decision = {
+          id: uuidv4(),
+          stationId: station.id,
+          stationName: station.name,
+          timestamp: new Date(),
+          trigger: rec.trigger,
+          severity: rec.severity,
+          action: rec.action,
+          mode,
+          explanation: rec.explanation,
+          status: mode === 'aggressive' ? 'auto-executed' : 'pending-approval',
+          metrics: station.metrics,
+          source: 'AI-Groq'
+        };
+        actions.push(decision);
+        explanations.push(decision.explanation);
+      });
+      return { actions, explanations };
+    }
+
+    // FALLBACK: Rule-based logic (original) if LLM fails or no key
+    if (triggers.length > 0 && !groqClient) console.log('⚠️ Using Rule-based Fallback');
+
     triggers.forEach(trigger => {
-      let action, why, expectedImpact, confidence;
+      let action, why, expectedImpact, confidence, probableRootCause, timeToStockoutMinutes;
 
       switch (trigger.name) {
         case 'Congestion':
@@ -419,22 +477,42 @@ const createRouter = (stationsData, decisionsLog) => {
           confidence = 'High';
           break;
 
+        case 'Demand Surge':
+          action = 'Reroute Drivers';
+          why = `${trigger.reason}. Consider rerouting to reduce load.`;
+          expectedImpact = 'Load balancing, Queue ↓';
+          confidence = 'High';
+          break;
+
         case 'Stockout Risk':
           action = 'Initiate Inventory Rebalance';
-          why = `${trigger.reason}. Station may run out of charged batteries.`;
+          timeToStockoutMinutes = trigger.timeToStockoutMinutes;
+          why = trigger.timeToStockoutMinutes
+            ? `${trigger.reason}. Estimated time to stockout: ~${trigger.timeToStockoutMinutes} min.`
+            : `${trigger.reason}. Station may run out of charged batteries.`;
           expectedImpact = 'Stockout probability ↓ by ~80%';
           confidence = 'High';
           break;
 
         case 'Charger Fault':
           action = 'Create Maintenance Ticket';
+          probableRootCause = 'Repeated errors suggest hardware or calibration issue.';
           why = `${trigger.reason}. Charger may need service.`;
           expectedImpact = 'Prevent charger failure, Uptime ↑';
           confidence = 'Medium';
           break;
 
+        case 'Recurring Fault':
+          action = 'Create Maintenance Ticket';
+          probableRootCause = `Same error (${trigger.errorCode || 'pattern'}) repeated — likely root cause: hardware or firmware.`;
+          why = `${trigger.reason}`;
+          expectedImpact = 'Prevent charger failure, Uptime ↑';
+          confidence = 'High';
+          break;
+
         case 'Charger Downtime':
           action = 'Alert Maintenance Team';
+          probableRootCause = `Uptime at ${station.metrics?.chargerUptimePercent}% — likely charger failures or connectivity.`;
           why = `${trigger.reason}. Charger reliability is degrading.`;
           expectedImpact = 'Early intervention, Uptime ↑ to 95%+';
           confidence = 'Medium';
@@ -463,7 +541,9 @@ const createRouter = (stationsData, decisionsLog) => {
         explanation: {
           why,
           expectedImpact,
-          confidence
+          confidence,
+          ...(probableRootCause && { probableRootCause }),
+          ...(timeToStockoutMinutes != null && { timeToStockoutMinutes })
         },
         status: mode === 'aggressive' ? 'auto-executed' : 'pending-approval',
         metrics: station.metrics
@@ -483,14 +563,24 @@ const createRouter = (stationsData, decisionsLog) => {
     return 'Warning';
   };
 
+  // Actions that can be auto-executed (have executeDecision implementation)
+  const EXECUTABLE_ACTIONS = ['Reroute Drivers', 'Create Maintenance Ticket', 'Alert Maintenance Team'];
+
+  const isExecutable = (action) => EXECUTABLE_ACTIONS.includes(action.action);
+
   // Evaluate and recommend actions
-  router.post('/evaluate/:stationId', (req, res) => {
+  router.post('/evaluate/:stationId', async (req, res) => {
     const { mode = 'conservative' } = req.body;
     const station = stationsData.get(req.params.stationId);
     if (!station) return res.status(404).json({ error: 'Station not found' });
 
+    // Refresh metrics from signals before evaluating
+    station.metrics = computeMetricsFromSignals(station);
+    station.lastUpdate = new Date();
+
     const triggers = checkTriggers(station);
-    const { actions, explanations } = decideAction(station, triggers, mode);
+    // Updated to await async decideAction
+    const { actions, explanations } = await decideAction(station, triggers, mode);
     const status = determineStatus(triggers);
 
     station.triggers = triggers;
@@ -498,17 +588,44 @@ const createRouter = (stationsData, decisionsLog) => {
 
     actions.forEach(action => decisionsLog.push(action));
 
+    // Aggressive mode: auto-execute executable actions (in simulation to avoid accidental live calls)
+    if (mode === 'aggressive') {
+      for (const action of actions) {
+        if (isExecutable(action)) {
+          try {
+            const result = await executeDecision(action, 'simulation');
+            action.status = result.executed ? 'executed' : 'auto-execute-failed';
+            action.execution = result;
+            action.executedAt = result.executedAt;
+            if (result.executed) {
+              console.log(`[Aggressive] Auto-executed: ${action.action} for ${action.stationId}`);
+            } else {
+              console.log(`[Aggressive] Auto-execute failed: ${action.action} - ${result.reason}`);
+            }
+          } catch (err) {
+            action.status = 'auto-execute-failed';
+            action.execution = { executed: false, error: err.message };
+            console.error(`[Aggressive] Auto-execute error:`, err.message);
+          }
+        }
+      }
+    }
+
     // Transform recommendations to match frontend format
     const transformedRecommendations = actions.map(action => ({
-      id: action.id, // Include decision ID for approval
+      id: action.id,
       action: action.action,
-      trigger: action.trigger, // Include trigger name
+      trigger: action.trigger,
+      status: action.status,
+      ...(action.execution && { execution: action.execution }),
       explanation: {
         why: action.explanation.why,
         expectedImpact: action.explanation.expectedImpact,
-        impact: action.explanation.expectedImpact, // Add 'impact' field
+        impact: action.explanation.expectedImpact,
         confidence: action.explanation.confidence,
-        confidenceScore: action.explanation.confidence === 'High' ? 90 : action.explanation.confidence === 'Medium' ? 70 : 50
+        confidenceScore: action.explanation.confidence === 'High' ? 90 : action.explanation.confidence === 'Medium' ? 70 : 50,
+        ...(action.explanation.probableRootCause && { probableRootCause: action.explanation.probableRootCause }),
+        ...(action.explanation.timeToStockoutMinutes != null && { timeToStockoutMinutes: action.explanation.timeToStockoutMinutes })
       }
     }));
 
@@ -528,19 +645,42 @@ const createRouter = (stationsData, decisionsLog) => {
   });
 
   // Bulk evaluate all stations
-  router.post('/evaluate-all', (req, res) => {
+  router.post('/evaluate-all', async (req, res) => {
     const { mode = 'conservative' } = req.body;
     const results = [];
 
     for (const [stationId, station] of stationsData.entries()) {
+      station.metrics = computeMetricsFromSignals(station);
+      station.lastUpdate = new Date();
+
       const triggers = checkTriggers(station);
-      const { actions } = decideAction(station, triggers, mode);
+      const { actions } = await decideAction(station, triggers, mode);
       const status = determineStatus(triggers);
 
       station.triggers = triggers;
       station.status = status;
 
       actions.forEach(action => decisionsLog.push(action));
+
+      // Aggressive mode: auto-execute executable actions
+      if (mode === 'aggressive') {
+        for (const action of actions) {
+          if (isExecutable(action)) {
+            try {
+              const result = await executeDecision(action, 'simulation');
+              action.status = result.executed ? 'executed' : 'auto-execute-failed';
+              action.execution = result;
+              action.executedAt = result.executedAt;
+              if (result.executed) {
+                console.log(`[Aggressive] Auto-executed: ${action.action} for ${action.stationId}`);
+              }
+            } catch (err) {
+              action.status = 'auto-execute-failed';
+              action.execution = { executed: false, error: err.message };
+            }
+          }
+        }
+      }
 
       results.push({
         stationId,
@@ -603,7 +743,7 @@ const createRouter = (stationsData, decisionsLog) => {
   // Get all alerts
   router.get('/alerts', (req, res) => {
     const alerts = [];
-    
+
     for (const [stationId, station] of stationsData.entries()) {
       if (station.triggers && station.triggers.length > 0) {
         alerts.push({
@@ -621,37 +761,66 @@ const createRouter = (stationsData, decisionsLog) => {
   return router;
 };
 
-// Export checkTriggers for use in other modules
+// Export checkTriggers for use in other modules (must refresh metrics first)
 const checkTriggersForStation = (station) => {
+  if (!station.metrics) return [];
   const { metrics } = station;
   const triggers = [];
 
-  // Congestion: Queue > 5 OR wait time > 7 mins
-  if (metrics.queueLength > 5) {
+  // Updated thresholds for higher sensitivity
+  if (metrics.queueLength > 3) {
     triggers.push({
       name: 'Congestion',
       severity: 'Warning',
       metric: 'queueLength',
       value: metrics.queueLength,
-      threshold: 5,
-      reason: `Queue length (${metrics.queueLength}) exceeds threshold (5)`
+      threshold: 3,
+      reason: `Queue length (${metrics.queueLength}) exceeds threshold (3)`
     });
   }
 
-  // Stockout risk: Charged batteries < 3 AND demand rising
-  if (metrics.chargedBatteries < 3 && metrics.swapRate > 5) {
+  const baseline = metrics.swapRateBaseline ?? metrics.swapRate;
+  if (baseline > 0 && metrics.swapRate >= 2 * baseline && metrics.swapRate >= 4) {
+    triggers.push({
+      name: 'Demand Surge',
+      severity: 'Warning',
+      metric: 'swapRate',
+      value: metrics.swapRate,
+      threshold: 2 * baseline,
+      reason: `Swap rate (${metrics.swapRate}/15min) is 2× baseline (${baseline})`
+    });
+  }
+
+  if (metrics.chargedBatteries < 4 && metrics.swapRate > 4) {
     triggers.push({
       name: 'Stockout Risk',
-      severity: metrics.chargedBatteries === 0 ? 'Critical' : 'Warning',
+      severity: metrics.chargedBatteries < 2 ? 'Critical' : 'Warning',
       metric: 'chargedBatteries',
       value: metrics.chargedBatteries,
-      threshold: 3,
+      threshold: 4,
       reason: `Low battery inventory (${metrics.chargedBatteries}) with high demand (${metrics.swapRate} swaps/15min)`
     });
   }
 
-  // Charger failure: Same error ≥ 3 times
-  if (metrics.errorFrequency >= 3) {
+  const errorSignals = (station.recentSignals || []).filter(s => s.type === 'error_log').slice(-20);
+  const byCode = {};
+  errorSignals.forEach(s => {
+    const code = s.data?.errorCode || s.data?.message || s.data?.code || 'UNKNOWN';
+    byCode[code] = (byCode[code] || 0) + 1;
+  });
+  const recurring = Object.entries(byCode).find(([, count]) => count >= 3);
+
+  if (recurring) {
+    triggers.push({
+      name: 'Recurring Fault',
+      severity: 'Warning',
+      metric: 'errorFrequency',
+      value: recurring[1],
+      threshold: 3,
+      reason: `Same error (${recurring[0]}) repeated ${recurring[1]} times — likely root cause`,
+      errorCode: recurring[0]
+    });
+  } else if (metrics.errorFrequency >= 3) {
     triggers.push({
       name: 'Charger Fault',
       severity: 'Warning',
@@ -662,7 +831,6 @@ const checkTriggersForStation = (station) => {
     });
   }
 
-  // Charger downtime: Uptime < 90%
   if (metrics.chargerUptimePercent < 90) {
     triggers.push({
       name: 'Charger Downtime',
@@ -674,7 +842,6 @@ const checkTriggersForStation = (station) => {
     });
   }
 
-  // Multi-failure (escalation)
   if (triggers.length >= 2) {
     triggers.push({
       name: 'Multi-Failure Escalation',
