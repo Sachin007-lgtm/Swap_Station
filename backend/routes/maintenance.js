@@ -10,10 +10,11 @@ const maintenanceTickets = [];
 const createRouter = () => {
   const MAINTENANCE_API_TOKEN = process.env.MAINTENANCE_API_TOKEN || 'DEMO_MAINTENANCE_TOKEN';
   const N8N_MAINTENANCE_WEBHOOK = process.env.N8N_MAINTENANCE_WEBHOOK || 'http://localhost:5678/webhook/maintenance-ticket';
+  const N8N_REROUTE_WEBHOOK = process.env.N8N_WEBHOOK_URL || 'http://localhost:5678/webhook/notification-trigger';
 
   console.log('🔧 Maintenance Router Initialized');
   console.log('   N8N_MAINTENANCE_WEBHOOK:', N8N_MAINTENANCE_WEBHOOK);
-  console.log('   MAINTENANCE_API_TOKEN:', MAINTENANCE_API_TOKEN ? 'SET' : 'NOT SET');
+  console.log('   N8N_REROUTE_WEBHOOK:', N8N_REROUTE_WEBHOOK);
 
   // POST endpoint to receive maintenance ticket notifications
   router.post('/ticket', async (req, res) => {
@@ -29,7 +30,7 @@ const createRouter = () => {
     }
 
     const payload = req.body;
-    
+
     // Add ticket metadata
     const ticket = {
       ...payload,
@@ -52,7 +53,7 @@ const createRouter = () => {
     try {
       console.log('📤 Attempting to forward to n8n:', N8N_MAINTENANCE_WEBHOOK);
       console.log('📦 Payload:', JSON.stringify(ticket, null, 2));
-      
+
       const n8nResponse = await fetch(N8N_MAINTENANCE_WEBHOOK, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -74,18 +75,18 @@ const createRouter = () => {
       console.error('❌ Stack:', n8nError.stack);
     }
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       ticket_id: ticket.id,
-      message: 'Maintenance ticket created successfully' 
+      message: 'Maintenance ticket created successfully'
     });
   });
 
   // GET endpoint to fetch ticket history
   router.get('/history', (req, res) => {
-    res.json({ 
+    res.json({
       tickets: maintenanceTickets,
-      total: maintenanceTickets.length 
+      total: maintenanceTickets.length
     });
   });
 
@@ -106,7 +107,7 @@ const createRouter = () => {
     }
 
     const { status, resolution, technician } = req.body;
-    
+
     if (status) ticket.status = status;
     if (resolution) ticket.resolution = resolution;
     if (technician) ticket.assigned_to = technician;
@@ -114,9 +115,9 @@ const createRouter = () => {
 
     console.log(`🔧 Ticket ${ticket.id} updated: status=${status}`);
 
-    res.json({ 
-      success: true, 
-      ticket 
+    res.json({
+      success: true,
+      ticket
     });
   });
 
@@ -125,9 +126,9 @@ const createRouter = () => {
     const count = maintenanceTickets.length;
     maintenanceTickets.length = 0;
     console.log(`🗑️ Cleared ${count} maintenance tickets`);
-    res.json({ 
-      success: true, 
-      message: `Cleared ${count} tickets` 
+    res.json({
+      success: true,
+      message: `Cleared ${count} tickets`
     });
   });
 

@@ -1,0 +1,175 @@
+.features-section {
+    background-color: var(--bg-white);
+    padding: 120px 0;
+}
+
+.section-header {
+    text-align: left;
+    /* Changed to left align as per image */
+    max-width: 800px;
+    margin-bottom: 80px;
+}
+
+.subtitle-text {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: #00D26A;
+    /* Green */
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 24px;
+}
+
+.section-header h2 {
+    font-size: 48px;
+    font-weight: 800;
+    color: var(--color-secondary);
+    line-height: 1.1;
+    margin-bottom: 32px;
+    max-width: 650px;
+}
+
+.section-description {
+    font-size: 18px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    max-width: 700px;
+}
+
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 24px;
+}
+
+.feature-card {
+    background: #FFFFFF;
+    /* Clean white background */
+    border-radius: 16px;
+    /* Slightly more rounded */
+    overflow: hidden;
+    transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    /* Smooth enterprise easing */
+    border: 1px solid #E2E8F0;
+    /* Subtle border */
+    position: relative;
+    height: 400px;
+    /* Fixed height for consistency */
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    /* Very subtle initial shadow */
+}
+
+.card-content {
+    padding: 40px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 60px;
+}
+
+.feature-icon-wrapper {
+    color: #94a3b8;
+    /* Default muted icon color */
+    transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.feature-category {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    transition: color 0.3s ease;
+}
+
+.card-main h3 {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--color-secondary);
+    margin-bottom: 16px;
+    transition: color 0.3s ease;
+}
+
+.card-main p {
+    font-size: 14px;
+    color: #64748B;
+    line-height: 1.6;
+}
+
+.card-footer {
+    margin-top: auto;
+    opacity: 0;
+    /* Hidden by default */
+    transform: translateY(10px);
+    transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+    /* Separator line */
+    padding-top: 24px;
+}
+
+.learn-more {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #00D26A;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: gap 0.3s ease;
+}
+
+.learn-more:hover {
+    gap: 12px;
+    /* Arrow slides right on hover */
+}
+
+/* Enterprise SaaS Hover Effects */
+.feature-card:hover {
+    background: #FFFFFF;
+    border-color: rgba(0, 210, 106, 0.3);
+    /* Subtle green border glow */
+    box-shadow:
+        0 1px 3px rgba(0, 0, 0, 0.04),
+        0 8px 24px rgba(0, 210, 106, 0.08),
+        0 16px 48px rgba(15, 23, 42, 0.06);
+    /* Layered shadow for depth */
+    transform: translateY(-6px) scale(1.02);
+    /* Subtle lift + gentle zoom */
+}
+
+.feature-card:hover .feature-icon-wrapper {
+    color: #00D26A;
+    /* Icon turns green */
+    transform: scale(1.05);
+    /* Subtle icon scale */
+}
+
+.feature-card:hover .feature-category {
+    color: #00D26A;
+    /* Category label turns green */
+}
+
+.feature-card:hover .card-main h3 {
+    color: #00D26A;
+    /* Title turns green on hover */
+}
+
+.feature-card:hover .card-footer {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+@media (max-width: 768px) {
+    .section-header h2 {
+        font-size: 36px;
+    }
+}

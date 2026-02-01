@@ -146,7 +146,7 @@ export const MaintenancePanel = ({
           return (
             <div
               key={idx}
-              className={`group bg-white rounded-[1.5rem] shadow-[0_2px_10px_-2px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.08)] transition-all duration-200 p-5 overflow-hidden ${severityColors[severity]}`}
+              className={`group bg-card rounded-[1.5rem] shadow-[0_2px_10px_-2px_rgba(0,0,0,0.2)] hover:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.3)] transition-all duration-200 p-5 overflow-hidden border border-border/50 ${severityColors[severity]}`}
             >
               <div className="flex items-start gap-4">
                 {/* Icon on left */}
@@ -159,7 +159,7 @@ export const MaintenancePanel = ({
                   {/* Title */}
                   <div className="font-bold text-foreground mb-1 text-base">
                     {ticket.issue.type === 'charger_downtime' ? 'Charger Downtime' : 'Charger Fault'}
-                    <span className="text-gray-400 font-normal mx-2">-</span>
+                    <span className="text-muted-foreground font-normal mx-2">-</span>
                     <span className={iconColors[severity]}>{ticket.station.name}</span>
                   </div>
 
@@ -172,9 +172,9 @@ export const MaintenancePanel = ({
 
                     {/* Issue details list */}
                     <div className="flex flex-wrap gap-2 text-xs font-medium">
-                      <span className="bg-gray-100 px-2 py-1 rounded-md text-gray-700">{ticket.impact.affected_chargers} chargers affected</span>
-                      <span className="bg-gray-100 px-2 py-1 rounded-md text-gray-700">{ticket.issue.current_uptime} uptime</span>
-                      <span className="bg-gray-100 px-2 py-1 rounded-md text-gray-700">{ticket.issue.error_count} errors</span>
+                      <span className="bg-muted px-2 py-1 rounded-md text-muted-foreground">{ticket.impact.affected_chargers} chargers affected</span>
+                      <span className="bg-muted px-2 py-1 rounded-md text-muted-foreground">{ticket.issue.current_uptime} uptime</span>
+                      <span className="bg-muted px-2 py-1 rounded-md text-muted-foreground">{ticket.issue.error_count} errors</span>
                     </div>
 
                     {/* Impact & SLA */}
@@ -203,15 +203,15 @@ export const MaintenancePanel = ({
 
   if (variant === 'sidebar') {
     return (
-      <div className="flex flex-col h-full bg-white shadow-2xl border-l border-border">
+      <div className="flex flex-col h-full bg-background shadow-2xl border-l border-border">
         {/* Header */}
         <div className="flex-shrink-0 border-b border-white/10 p-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-900/30">
-                <Wrench className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+              <div className="p-2 rounded-lg bg-orange-500/10">
+                <Wrench className="w-5 h-5 text-orange-500" />
               </div>
-              <h3 className="text-lg font-semibold">Maintenance Tickets</h3>
+              <h3 className="text-lg font-bold text-foreground">Maintenance Tickets</h3>
             </div>
             <Button
               variant="ghost"

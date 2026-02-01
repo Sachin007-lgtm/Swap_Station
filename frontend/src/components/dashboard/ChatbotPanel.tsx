@@ -18,7 +18,7 @@ interface Message {
 
 export const ChatbotPanel = ({ isOpen, onClose }: ChatbotPanelProps) => {
     const [messages, setMessages] = useState<Message[]>([
-        { role: 'assistant', content: 'Hello! I am StationOS AI. Ask me anything about your station network, alerts, or performance metrics.' }
+        { role: 'assistant', content: 'Hello! I am your SmartSwap Assistant. Ask me anything about your station network, alerts, or performance metrics.' }
     ]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);

@@ -1,9 +1,12 @@
-import { Bell, Search, Settings, Zap, Route, Bot, Sparkles } from 'lucide-react';
+import { Bell, Search, Settings, Zap, Route, Bot, Sparkles, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
+import { Link } from 'react-router-dom';
 
 interface HeaderProps {
   isScrolled?: boolean;
@@ -36,6 +39,13 @@ export const Header = ({
   copilotMode = 'conservative',
   onCopilotModeChange,
 }: HeaderProps) => {
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate('/');
+  };
+
   return (
     <header className={cn(
       "px-8 py-3 transition-all duration-500 sticky top-0 z-50",
@@ -45,7 +55,7 @@ export const Header = ({
     )}>
       <div className="flex items-center justify-between max-w-[1800px] mx-auto">
         {/* Logo Area */}
-        <div className="flex items-center gap-3">
+        <Link to="/" className="flex items-center gap-3">
           <div className={cn(
             "w-9 h-9 rounded-full flex items-center justify-center shadow-md transition-all duration-500",
             isScrolled ? "bg-primary text-primary-foreground" : "bg-white text-[#3081ce]"
@@ -57,10 +67,10 @@ export const Header = ({
               "text-lg font-bold tracking-tight font-poppins leading-none transition-colors duration-500",
               isScrolled ? "text-gray-900" : "text-white"
             )}>
-              Station<span className={cn(
+              Smart<span className={cn(
                 "transition-colors duration-300",
                 isScrolled ? "text-primary" : "text-white/90"
-              )}>OS</span>
+              )}>Swap</span>
             </span>
             <div className="flex items-center gap-1.5 mt-0.5">
               <div className={cn(
@@ -75,7 +85,7 @@ export const Header = ({
               </span>
             </div>
           </div>
-        </div>
+        </Link>
 
         {/* Centered Navigation */}
         <nav className={cn(
@@ -87,8 +97,7 @@ export const Header = ({
             { name: 'Stations', click: onStationsClick },
             { name: 'Analytics', click: onChatClick },
             { name: 'Reroutes', click: onRerouteClick },
-            { name: 'Maintenance', click: onMaintenanceClick },
-            { name: 'Settings', click: undefined }
+            { name: 'Maintenance', click: onMaintenanceClick }
           ].map((item) => (
             <button
               key={item.name}
@@ -145,9 +154,8 @@ export const Header = ({
 
           <div className="flex items-center gap-2">
             {[
-              { icon: Route, count: rerouteCount, click: onRerouteClick, color: "bg-amber-500" },
-              { icon: Bell, count: activeAlerts, click: onAlertsClick, color: "bg-red-500" },
-              { icon: Settings, count: maintenanceCount, click: onMaintenanceClick, color: "bg-primary" }
+              { icon: Route, count: rerouteCount, click: onRerouteClick, color: "var(--status-warning)" },
+              { icon: Bell, count: activeAlerts, click: onAlertsClick, color: "var(--status-critical)" }
             ].map((btn, i) => (
               <Button
                 key={i}
@@ -191,10 +199,16 @@ export const Header = ({
               </Button>
             )}
 
-            <div className={cn(
-              "w-9 h-9 rounded-full bg-gradient-to-tr from-[#00d2ff] to-[#3a7bd5] ml-2 border-2 cursor-pointer hover:shadow-md transition-all duration-300",
-              isScrolled ? "border-gray-200" : "border-white/40 shadow-lg"
-            )} />
+            <div
+              className={cn(
+                "w-9 h-9 rounded-full bg-gradient-to-tr from-[#00d2ff] to-[#3a7bd5] ml-2 border-2 cursor-pointer hover:shadow-md transition-all duration-500 flex items-center justify-center group relative",
+                isScrolled ? "border-gray-200" : "border-white/40 shadow-lg"
+              )}
+              onClick={handleLogout}
+              title="Logout"
+            >
+              <LogOut className="w-4 h-4 text-white opacity-0 group-hover:opacity-100 transition-opacity absolute" />
+            </div>
           </div>
         </div>
       </div>

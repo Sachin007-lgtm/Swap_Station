@@ -76,7 +76,7 @@ const createRouter = (stationsData, decisionsLog) => {
         }
 
         // 3. Prompt Engineering
-        const systemPrompt = `You are the "StationOS Analytics Assistant", an expert AI for an EV Battery Swap Network.
+        const systemPrompt = `You are the "SmartSwap Assistant", an expert AI for an EV Battery Swap Network.
     
     Current System State (Real-time):
     - Total Stations: ${stations.length}

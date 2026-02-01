@@ -9,9 +9,10 @@ const router = express.Router();
 
 const createRouter = (stationsData, decisionsLog) => {
   // Configuration
-  const REROUTE_API_ENDPOINT = process.env.REROUTE_API_ENDPOINT || 'http://localhost:5000/api/reroute-driver';
+  const PORT = process.env.PORT || 5000;
+  const REROUTE_API_ENDPOINT = process.env.REROUTE_API_ENDPOINT || `http://localhost:${PORT}/api/reroute-driver`;
   const REROUTE_API_TOKEN = process.env.REROUTE_API_TOKEN || 'DEMO_REROUTE_TOKEN';
-  const MAINTENANCE_API_ENDPOINT = process.env.MAINTENANCE_API_ENDPOINT || 'http://localhost:5000/api/maintenance/ticket';
+  const MAINTENANCE_API_ENDPOINT = process.env.MAINTENANCE_API_ENDPOINT || `http://localhost:${PORT}/api/maintenance/ticket`;
   const MAINTENANCE_API_TOKEN = process.env.MAINTENANCE_API_TOKEN || 'DEMO_MAINTENANCE_TOKEN';
   const DEMO_DRIVER_PHONE = process.env.DEMO_DRIVER_PHONE || '+919818166684';
   const GROQ_API_KEY = process.env.GROQ_API_KEY;
