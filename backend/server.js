@@ -8,14 +8,27 @@ const supabase = require('./db/supabaseClient');
 
 const app = express();
 const server = http.createServer(app);
+
+// Configure CORS to allow frontend domain
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'https://swap-station-frontend.onrender.com',
+  process.env.FRONTEND_URL
+].filter(Boolean);
+
 const io = socketIo(server, {
   cors: {
-    origin: "http://localhost:3000",
-    methods: ["GET", "POST"]
+    origin: allowedOrigins,
+    methods: ["GET", "POST"],
+    credentials: true
   }
 });
 
-app.use(cors());
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true
+}));
 app.use(express.json());
 
 // In-memory data store
