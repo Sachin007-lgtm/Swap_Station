@@ -34,6 +34,7 @@ const Navbar = () => {
                     <Link to="/auth" onClick={() => setIsOpen(false)}>DASHBOARD</Link>
                     <a href="#about" onClick={() => setIsOpen(false)}>ABOUT</a>
                     <a href="#services" onClick={() => setIsOpen(false)}>SERVICES</a>
+                    <a href="#privacy" onClick={() => setIsOpen(false)}>PRIVACY</a>
                     <a href="#contact" onClick={() => setIsOpen(false)}>CONTACT</a>
                 </div>
 
