@@ -1,0 +1,108 @@
+.privacy-section {
+    background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+    padding: 120px 0;
+}
+
+.privacy-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 32px;
+    margin-top: 64px;
+}
+
+.privacy-card {
+    background: white;
+    padding: 40px 32px;
+    border-radius: 16px;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.privacy-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+    border-color: var(--color-primary);
+}
+
+.privacy-icon {
+    width: 64px;
+    height: 64px;
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    margin-bottom: 24px;
+}
+
+.privacy-card h3 {
+    font-size: 20px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 12px;
+}
+
+.privacy-card p {
+    color: rgba(15, 23, 42, 0.7);
+    line-height: 1.7;
+    font-size: 15px;
+}
+
+.privacy-footer {
+    margin-top: 80px;
+    text-align: center;
+    padding: 40px;
+    background: white;
+    border-radius: 16px;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.privacy-footer p {
+    color: rgba(15, 23, 42, 0.7);
+    line-height: 1.8;
+    margin-bottom: 12px;
+}
+
+.privacy-footer p:last-child {
+    margin-bottom: 0;
+}
+
+.privacy-footer strong {
+    color: #0f172a;
+    font-weight: 600;
+}
+
+.privacy-link {
+    color: var(--color-primary);
+    font-weight: 600;
+    text-decoration: none;
+    transition: opacity 0.2s;
+}
+
+.privacy-link:hover {
+    opacity: 0.8;
+    text-decoration: underline;
+}
+
+@media (max-width: 768px) {
+    .privacy-section {
+        padding: 80px 0;
+    }
+
+    .privacy-grid {
+        grid-template-columns: 1fr;
+        gap: 24px;
+        margin-top: 48px;
+    }
+
+    .privacy-card {
+        padding: 32px 24px;
+    }
+
+    .privacy-footer {
+        margin-top: 48px;
+        padding: 32px 24px;
+    }
+}

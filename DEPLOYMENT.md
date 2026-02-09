@@ -38,6 +38,10 @@
    N8N_MAINTENANCE_WEBHOOK=<your-n8n-url>/webhook/maintenance-ticket
    ```
 
+   > **⚠️ IMPORTANT:** n8n must be publicly accessible! 
+   > - ❌ `http://localhost:5678` will NOT work on Render
+   > - ✅ Use n8n.cloud, self-hosted n8n with public URL, or ngrok for testing
+
    **Frontend Service:**
    ```
    VITE_SUPABASE_URL=<your-supabase-url>

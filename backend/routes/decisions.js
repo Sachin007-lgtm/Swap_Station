@@ -416,7 +416,7 @@ Recommend actions.
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        model: 'llama-3.3-70b-versatile',
+        model: 'llama-3.1-8b-instant',
         temperature: 0.1,
         response_format: { type: 'json_object' }
       });

@@ -5,6 +5,7 @@ import HowItWorks from '../components/landing/HowItWorks';
 import ServiceStack from '../components/landing/ServiceStack';
 import CallToAction from '../components/landing/CallToAction';
 import Ecosystem from '../components/landing/Ecosystem';
+import PrivacyPolicy from '../components/landing/PrivacyPolicy';
 import Footer from '../components/landing/Footer';
 import '../components/landing/Landing.css';
 import '../components/landing/LandingGlobal.css';
@@ -19,6 +20,7 @@ const LandingPage = () => {
             <ServiceStack />
             <CallToAction />
             <Ecosystem />
+            <PrivacyPolicy />
             <Footer />
         </div>
     );
